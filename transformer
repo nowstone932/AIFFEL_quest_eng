@@ -1,0 +1,1898 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/nowstone932/AIFFEL_quest_eng/blob/main/transformer\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "id": "ed8f231b-ad68-472c-84c0-addf50854d07",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "ed8f231b-ad68-472c-84c0-addf50854d07",
+        "outputId": "de2362c3-b5c1-4191-f2cb-c4390684353b"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "2.10.0+cu128\n",
+            "2.0.2\n",
+            "3.10.0\n"
+          ]
+        }
+      ],
+      "source": [
+        "import torch\n",
+        "import numpy\n",
+        "import matplotlib\n",
+        "\n",
+        "print(torch.__version__)\n",
+        "print(numpy.__version__)\n",
+        "print(matplotlib.__version__)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 3,
+      "id": "a70a4332-bce9-4576-a8f7-da8048e9e7c4",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "a70a4332-bce9-4576-a8f7-da8048e9e7c4",
+        "outputId": "4f33bab2-e78f-4221-ea35-8815004c9042"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "--2026-05-17 14:38:06--  https://github.com/jungyeul/korean-parallel-corpora/raw/master/korean-english-news-v1/korean-english-park.train.tar.gz\n",
+            "Resolving github.com (github.com)... 140.82.116.4\n",
+            "Connecting to github.com (github.com)|140.82.116.4|:443... connected.\n",
+            "HTTP request sent, awaiting response... 302 Found\n",
+            "Location: https://raw.githubusercontent.com/jungyeul/korean-parallel-corpora/master/korean-english-news-v1/korean-english-park.train.tar.gz [following]\n",
+            "--2026-05-17 14:38:07--  https://raw.githubusercontent.com/jungyeul/korean-parallel-corpora/master/korean-english-news-v1/korean-english-park.train.tar.gz\n",
+            "Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.108.133, 185.199.109.133, 185.199.110.133, ...\n",
+            "Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.108.133|:443... connected.\n",
+            "HTTP request sent, awaiting response... 200 OK\n",
+            "Length: 8718893 (8.3M) [application/octet-stream]\n",
+            "Saving to: ‘/root/work/workplace/AIFFEL_quest_eng/transformer/korean-english-park.train.tar.gz’\n",
+            "\n",
+            "korean-english-park 100%[===================>]   8.31M  --.-KB/s    in 0.08s   \n",
+            "\n",
+            "2026-05-17 14:38:08 (103 MB/s) - ‘/root/work/workplace/AIFFEL_quest_eng/transformer/korean-english-park.train.tar.gz’ saved [8718893/8718893]\n",
+            "\n",
+            "gzip: /root/work/workplace/AIFFEL_quest_eng/transformer/korean-english-park.train.tar already exists; do you wish to overwrite (y or n)? y\n",
+            "korean-english-park.train.en\n",
+            "korean-english-park.train.ko\n"
+          ]
+        }
+      ],
+      "source": [
+        "!wget https://github.com/jungyeul/korean-parallel-corpora/raw/master/korean-english-news-v1/korean-english-park.train.tar.gz -P ~/work/workplace/AIFFEL_quest_eng/transformer/\n",
+        "!gzip -d ~/work/workplace/AIFFEL_quest_eng/transformer/korean-english-park.train.tar.gz\n",
+        "!tar -xvf ~/work/workplace/AIFFEL_quest_eng/transformer/korean-english-park.train.tar"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 4,
+      "id": "3234def1-d78d-4f7f-aeb0-d63d3b626c5e",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "3234def1-d78d-4f7f-aeb0-d63d3b626c5e",
+        "outputId": "762a37f6-61f5-433c-8d6f-5004c019a6cf"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "2.10.0+cu128\n",
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "import numpy as np\n",
+        "import torch\n",
+        "import torch.nn as nn\n",
+        "import torch.nn.functional as F\n",
+        "import torch.optim as optim\n",
+        "import matplotlib.pyplot as plt\n",
+        "\n",
+        "import re\n",
+        "import os\n",
+        "import io\n",
+        "import time\n",
+        "import random\n",
+        "import math\n",
+        "\n",
+        "import seaborn # Attention 시각화를 위해 필요!\n",
+        "\n",
+        "print(torch.__version__)\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 5,
+      "id": "2c101c9c-6775-4b0e-91b3-e571dd949c38",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "2c101c9c-6775-4b0e-91b3-e571dd949c38",
+        "outputId": "88a8f742-9a6a-4c7d-bb99-b8dcdea2b042"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "data_dir = os.path.join(os.getenv(\"HOME\"), 'work/workplace/AIFFEL_quest_eng/transformer')\n",
+        "kor_path = \"/content/korean-english-park.train.ko\"\n",
+        "eng_path = \"/content/korean-english-park.train.en\"\n",
+        "\n",
+        "# 데이터 정제 및 토큰화\n",
+        "def clean_corpus(kor_path, eng_path):\n",
+        "    with open(kor_path, \"r\") as f: kor = f.read().splitlines()\n",
+        "    with open(eng_path, \"r\") as f: eng = f.read().splitlines()\n",
+        "    assert len(kor) == len(eng)\n",
+        "\n",
+        "    cleaned_corpus = list(set([str(\"\\t\".join([k, e])) for k, e in zip(kor, eng)]))\n",
+        "\n",
+        "    return cleaned_corpus\n",
+        "\n",
+        "cleaned_corpus = clean_corpus(kor_path, eng_path)\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 6,
+      "id": "06779728-5224-4323-96b6-5249bc938e12",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "06779728-5224-4323-96b6-5249bc938e12",
+        "outputId": "12013015-bafb-4cf3-db0e-4fee96ac6e06"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "def preprocess_sentence(sentence):\n",
+        "\n",
+        "  sentence = sentence.lower()\n",
+        "  sentence = re.sub(r\"[^a-zA-Z가-힣?.!,]+\", \" \", sentence)\n",
+        "  sentence = re.sub(r\"([?.!,])\", r\" \\1 \", sentence)\n",
+        "  sentence = re.sub(r'[\" \"]+', \" \", sentence)\n",
+        "\n",
+        "  return sentence\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 7,
+      "id": "1419eec2-b7a1-4c97-952f-f5753eb18324",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "1419eec2-b7a1-4c97-952f-f5753eb18324",
+        "outputId": "3fb2c89f-d352-4376-d32c-9fc4d9adc1fa"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Requirement already satisfied: sentencepiece in /usr/local/lib/python3.12/dist-packages (0.2.1)\n",
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "!pip install sentencepiece\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 8,
+      "id": "e022861f-14ec-4d21-b15d-8332c1683daf",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "e022861f-14ec-4d21-b15d-8332c1683daf",
+        "outputId": "f04f6887-3289-417c-ee58-97090640856f"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Sentencepiece를 활용하여 학습한 tokenizer를 생성합니다.\n",
+        "def generate_tokenizer(corpus,\n",
+        "                        vocab_size,\n",
+        "                        lang=\"ko\",\n",
+        "                        pad_id=0,\n",
+        "                        bos_id=1,\n",
+        "                        eos_id=2,\n",
+        "                        unk_id=3):\n",
+        "    file = \"./%s_corpus.txt\" % lang\n",
+        "    model = \"%s_spm\" % lang\n",
+        "\n",
+        "    with open(file, 'w') as f:\n",
+        "      for row in corpus: f.write(str(row) + '\\n')\n",
+        "\n",
+        "    import sentencepiece as spm\n",
+        "    spm.SentencePieceTrainer.Train(\n",
+        "      '--input=./%s --model_prefix=%s --vocab_size=%d'\\\n",
+        "      % (file, model, vocab_size) + \\\n",
+        "      '--pad_id==%d --bos_id=%d --eos_id=%d --unk_id=%d'\\\n",
+        "      % (pad_id, bos_id, eos_id, unk_id)\n",
+        "    )\n",
+        "\n",
+        "    tokenizer = spm.SentencePieceProcessor()\n",
+        "    tokenizer.Load('%s.model' % model)\n",
+        "\n",
+        "    return tokenizer\n",
+        "\n",
+        "\n",
+        "def preprocess_sentence(sentence):\n",
+        "\n",
+        "  sentence = sentence.lower()\n",
+        "  sentence = re.sub(r\"[^a-zA-Z가-힣?.!,]+\", \" \", sentence)\n",
+        "  sentence = re.sub(r\"([?.!,])\", r\" \\1 \", sentence)\n",
+        "  sentence = re.sub(r'[\" \"]+', \" \", sentence)\n",
+        "\n",
+        "  return sentence\n",
+        "\n",
+        "\n",
+        "SRC_VOCAB_SIZE = TGT_VOCAB_SIZE = 20000\n",
+        "\n",
+        "eng_corpus = []\n",
+        "kor_corpus = []\n",
+        "\n",
+        "for pair in cleaned_corpus:\n",
+        "    k, e = pair.split(\"\\t\")\n",
+        "\n",
+        "    kor_corpus.append(preprocess_sentence(k))\n",
+        "    eng_corpus.append(preprocess_sentence(e))\n",
+        "\n",
+        "ko_tokenizer = generate_tokenizer(kor_corpus, SRC_VOCAB_SIZE, \"ko\")\n",
+        "en_tokenizer = generate_tokenizer(eng_corpus, TGT_VOCAB_SIZE, \"en\")\n",
+        "en_tokenizer.set_encode_extra_options(\"bos:eos\")\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 9,
+      "id": "50fb1895-7640-426c-8b8d-ed2e0335f27b",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 86,
+          "referenced_widgets": [
+            "ce9f391dae10472cb419a7325fe31e3c",
+            "0787232240d54e638475aeb9675561e4",
+            "23541bedc9a0491fba30e10f71203ab0",
+            "9a95700a0a9f425b9f36cad758173bb0",
+            "fea823f0859749fabdd3fff3c927621f",
+            "790937ef217c45f2b8a0f7659042cd7f",
+            "23ad8de3cf5342079eec1b822e70b0ad",
+            "44d053eeda5d4d27a60b08d9d4981770",
+            "846cc56f6cb8456ca1281c037c3dbda7",
+            "36cfe0bf147346538ee94c70dc9c7bbe",
+            "993f4e55b69546b6997038791000cb65"
+          ]
+        },
+        "id": "50fb1895-7640-426c-8b8d-ed2e0335f27b",
+        "outputId": "73298121-c996-4dfc-f819-56840698fcd6"
+      },
+      "outputs": [
+        {
+          "output_type": "display_data",
+          "data": {
+            "text/plain": [
+              "  0%|          | 0/78968 [00:00<?, ?it/s]"
+            ],
+            "application/vnd.jupyter.widget-view+json": {
+              "version_major": 2,
+              "version_minor": 0,
+              "model_id": "ce9f391dae10472cb419a7325fe31e3c"
+            }
+          },
+          "metadata": {}
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "torch.Size([72107, 50]) torch.Size([72107, 50])\n",
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "import torch\n",
+        "import torch.nn.functional as F\n",
+        "from tqdm.notebook import tqdm  # 진행 과정 보기\n",
+        "\n",
+        "src_corpus = []\n",
+        "tgt_corpus = []\n",
+        "\n",
+        "assert len(kor_corpus) == len(eng_corpus)\n",
+        "\n",
+        "# 토큰의 길이가 50 이하인 문장만 남깁니다.\n",
+        "for idx in tqdm(range(len(kor_corpus))):\n",
+        "    src_tokens = ko_tokenizer.encode_as_ids(kor_corpus[idx])\n",
+        "    tgt_tokens = en_tokenizer.encode_as_ids(eng_corpus[idx])\n",
+        "\n",
+        "    if len(src_tokens) <= 50 and len(tgt_tokens) <= 50:\n",
+        "        src_corpus.append(torch.tensor(src_tokens, dtype=torch.long))\n",
+        "        tgt_corpus.append(torch.tensor(tgt_tokens, dtype=torch.long))\n",
+        "\n",
+        "def pad_sequences(sequences, padding_value=0):\n",
+        "    return torch.nn.utils.rnn.pad_sequence(sequences, batch_first=True, padding_value=padding_value)\n",
+        "\n",
+        "# 패딩처리를 완료하여 학습용 데이터를 완성합니다.\n",
+        "enc_train = pad_sequences(src_corpus, padding_value=0)\n",
+        "dec_train = pad_sequences(tgt_corpus, padding_value=0)\n",
+        "\n",
+        "print(enc_train.shape, dec_train.shape)\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 10,
+      "id": "199d2705-008c-4760-9227-0dd236d052e2",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "199d2705-008c-4760-9227-0dd236d052e2",
+        "outputId": "47ce057c-c239-437b-b537-8ffcd0257846"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "def positional_encoding(pos, d_model):\n",
+        "    def cal_angle(position, i):\n",
+        "\n",
+        "        return position / np.power(10000, int(i) / d_model)\n",
+        "\n",
+        "    def get_posi_angle_vec(position):\n",
+        "        return [cal_angle(position, i) for i in range(d_model)]\n",
+        "\n",
+        "    sinusoid_table = np.array([get_posi_angle_vec(pos_i) for pos_i in range(pos)])\n",
+        "\n",
+        "    sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])\n",
+        "    sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])\n",
+        "\n",
+        "    return sinusoid_table\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 11,
+      "id": "0dbb9b84-bd51-4ddb-b866-2e5dc9d25967",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "0dbb9b84-bd51-4ddb-b866-2e5dc9d25967",
+        "outputId": "be11a55b-418e-4d62-b0cc-0ea1a5a93c4b"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class MultiHeadAttention(nn.Module):\n",
+        "    def __init__(self, d_model, num_heads):\n",
+        "        super(MultiHeadAttention, self).__init__()\n",
+        "        self.num_heads = num_heads\n",
+        "        self.d_model = d_model\n",
+        "        self.depth = d_model // num_heads\n",
+        "\n",
+        "        assert d_model % num_heads == 0, \"d_model must be divisible by num_heads\"\n",
+        "\n",
+        "        self.W_q = nn.Linear(d_model, d_model)\n",
+        "        self.W_k = nn.Linear(d_model, d_model)\n",
+        "        self.W_v = nn.Linear(d_model, d_model)\n",
+        "\n",
+        "        self.linear = nn.Linear(d_model, d_model)\n",
+        "\n",
+        "    def scaled_dot_product_attention(self, Q, K, V, mask=None):\n",
+        "        d_k = K.shape[-1]\n",
+        "        QK = torch.matmul(Q, K.transpose(-2, -1))\n",
+        "        # Fix: Ensure the scaling factor is on the same device as QK\n",
+        "        scaled_qk = QK / torch.sqrt(torch.tensor(d_k, dtype=torch.float32, device=QK.device))\n",
+        "\n",
+        "        if mask is not None:\n",
+        "            # Ensure mask is on the same device as scaled_qk\n",
+        "            scaled_qk = scaled_qk.masked_fill(mask == 0, float('-1e9'))\n",
+        "\n",
+        "        attentions = F.softmax(scaled_qk, dim=-1)\n",
+        "        out = torch.matmul(attentions, V)\n",
+        "\n",
+        "        return out, attentions\n",
+        "\n",
+        "    def split_heads(self, x):\n",
+        "        bsz, seq_len, d_model = x.shape\n",
+        "        x = x.view(bsz, seq_len, self.num_heads, self.depth)\n",
+        "        x = x.permute(0, 2, 1, 3)\n",
+        "        return x\n",
+        "\n",
+        "    def combine_heads(self, x):\n",
+        "        bsz, num_heads, seq_len, depth = x.shape\n",
+        "        x = x.permute(0, 2, 1, 3).contiguous()\n",
+        "        x = x.view(bsz, seq_len, self.d_model)\n",
+        "        return x\n",
+        "\n",
+        "    def forward(self, Q, K, V, mask=None):\n",
+        "        WQ = self.W_q(Q)\n",
+        "        WK = self.W_k(K)\n",
+        "        WV = self.W_v(V)\n",
+        "\n",
+        "        WQ_splits = self.split_heads(WQ)\n",
+        "        WK_splits = self.split_heads(WK)\n",
+        "        WV_splits = self.split_heads(WV)\n",
+        "\n",
+        "        out, attention_weights = self.scaled_dot_product_attention(\n",
+        "            WQ_splits, WK_splits, WV_splits, mask)\n",
+        "\n",
+        "        out = self.combine_heads(out)\n",
+        "        out = self.linear(out)\n",
+        "\n",
+        "        return out, attention_weights\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 12,
+      "id": "0659d33b-f97c-4073-b479-2fee92c21013",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "0659d33b-f97c-4073-b479-2fee92c21013",
+        "outputId": "05309797-8c85-4c33-f986-9c1aed7d3811"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class PoswiseFeedForwardNet(nn.Module):\n",
+        "    def __init__(self, d_model, d_ff):\n",
+        "        super(PoswiseFeedForwardNet, self).__init__()\n",
+        "        self.fc1 = nn.Linear(d_model, d_ff)\n",
+        "        self.fc2 = nn.Linear(d_ff, d_model)\n",
+        "        self.relu = nn.ReLU()\n",
+        "\n",
+        "    def forward(self, x):\n",
+        "        out = self.fc1(x)\n",
+        "        out = self.relu(out)\n",
+        "        out = self.fc2(out)\n",
+        "\n",
+        "        return out\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 13,
+      "id": "bdb193d5-379f-4436-8643-196367d24510",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "bdb193d5-379f-4436-8643-196367d24510",
+        "outputId": "bf084743-6db5-4e8f-de76-8a6470710ecc"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class EncoderLayer(nn.Module):\n",
+        "    def __init__(self, d_model, n_heads, d_ff, dropout):\n",
+        "        super(EncoderLayer, self).__init__()\n",
+        "\n",
+        "        self.enc_self_attn = MultiHeadAttention(d_model, n_heads)\n",
+        "        self.ffn = PoswiseFeedForwardNet(d_model, d_ff)\n",
+        "\n",
+        "        self.norm_1 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "        self.norm_2 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "\n",
+        "        self.dropout = nn.Dropout(dropout)\n",
+        "\n",
+        "    def forward(self, x, mask):\n",
+        "        \"\"\"\n",
+        "        Multi-Head Attention\n",
+        "        \"\"\"\n",
+        "        residual = x\n",
+        "        out = self.norm_1(x)\n",
+        "        out, enc_attn = self.enc_self_attn(out, out, out, mask)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        \"\"\"\n",
+        "        Position-Wise Feed Forward Network\n",
+        "        \"\"\"\n",
+        "        residual = out\n",
+        "        out = self.norm_2(out)\n",
+        "        out = self.ffn(out)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        return out, enc_attn\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 14,
+      "id": "24b181f4-c69c-470b-9e65-bcf3e8453981",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "24b181f4-c69c-470b-9e65-bcf3e8453981",
+        "outputId": "fed3dbea-c842-4534-c899-8a87d787dc9e"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class EncoderLayer(nn.Module):\n",
+        "    def __init__(self, d_model, n_heads, d_ff, dropout):\n",
+        "        super(EncoderLayer, self).__init__()\n",
+        "\n",
+        "        self.enc_self_attn = MultiHeadAttention(d_model, n_heads)\n",
+        "        self.ffn = PoswiseFeedForwardNet(d_model, d_ff)\n",
+        "\n",
+        "        self.norm_1 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "        self.norm_2 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "\n",
+        "        self.dropout = nn.Dropout(dropout)\n",
+        "\n",
+        "    def forward(self, x, mask):\n",
+        "        \"\"\"\n",
+        "        Multi-Head Attention\n",
+        "        \"\"\"\n",
+        "        residual = x\n",
+        "        out = self.norm_1(x)\n",
+        "        out, enc_attn = self.enc_self_attn(out, out, out, mask)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        \"\"\"\n",
+        "        Position-Wise Feed Forward Network\n",
+        "        \"\"\"\n",
+        "        residual = out\n",
+        "        out = self.norm_2(out)\n",
+        "        out = self.ffn(out)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        return out, enc_attn\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 15,
+      "id": "6f4eef53-632c-479d-8f40-128f570817bc",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "6f4eef53-632c-479d-8f40-128f570817bc",
+        "outputId": "8dd40b52-1b60-4312-d2c8-97a3a82a9301"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class DecoderLayer(nn.Module):\n",
+        "    def __init__(self, d_model, num_heads, d_ff, dropout):\n",
+        "        super(DecoderLayer, self).__init__()\n",
+        "\n",
+        "        self.dec_self_attn = MultiHeadAttention(d_model, num_heads)\n",
+        "        self.enc_dec_attn = MultiHeadAttention(d_model, num_heads)\n",
+        "\n",
+        "        self.ffn = PoswiseFeedForwardNet(d_model, d_ff)\n",
+        "\n",
+        "        self.norm_1 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "        self.norm_2 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "        self.norm_3 = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "\n",
+        "        self.dropout = nn.Dropout(dropout)\n",
+        "\n",
+        "    def forward(self, x, enc_out, causality_mask, padding_mask):\n",
+        "        \"\"\"\n",
+        "        Masked Multi-Head Attention\n",
+        "        \"\"\"\n",
+        "        residual = x\n",
+        "        out = self.norm_1(x)\n",
+        "        out, dec_attn = self.dec_self_attn(out, out, out, padding_mask)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        \"\"\"\n",
+        "        Multi-Head Attention\n",
+        "        \"\"\"\n",
+        "        residual = out\n",
+        "        out = self.norm_2(out)\n",
+        "        out, dec_enc_attn = self.enc_dec_attn(out, enc_out, enc_out, causality_mask)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        \"\"\"\n",
+        "        Position-Wise Feed Forward Network\n",
+        "        \"\"\"\n",
+        "        residual = out\n",
+        "        out = self.norm_3(out)\n",
+        "        out = self.ffn(out)\n",
+        "        out = self.dropout(out)\n",
+        "        out += residual\n",
+        "\n",
+        "        return out, dec_attn, dec_enc_attn\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 16,
+      "id": "ce4b1cbf-840d-4b89-aa2a-ce7bae35223b",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "ce4b1cbf-840d-4b89-aa2a-ce7bae35223b",
+        "outputId": "06515815-78d4-48d7-a8f6-cdc5b142ece6"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class Encoder(nn.Module):\n",
+        "    def __init__(self, n_layers, d_model, n_heads, d_ff, dropout):\n",
+        "        super(Encoder, self).__init__()\n",
+        "        self.n_layers = n_layers\n",
+        "        self.enc_layers = nn.ModuleList([\n",
+        "            EncoderLayer(d_model, n_heads, d_ff, dropout)\n",
+        "            for _ in range(n_layers)\n",
+        "        ])\n",
+        "        self.final_norm = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "\n",
+        "    def forward(self, x, mask):\n",
+        "        out = x\n",
+        "        enc_attns = []\n",
+        "\n",
+        "        for i in range(self.n_layers):\n",
+        "            out, enc_attn = self.enc_layers[i](out, mask)\n",
+        "            enc_attns.append(enc_attn)\n",
+        "        out = self.final_norm(out)\n",
+        "        return out, enc_attns\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 17,
+      "id": "c45a9125-fdfd-481b-a6b8-d5581f4756ac",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "c45a9125-fdfd-481b-a6b8-d5581f4756ac",
+        "outputId": "368994e5-8490-41f8-c692-ec2457d7eff7"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class Decoder(nn.Module):\n",
+        "    def __init__(self, n_layers, d_model, n_heads, d_ff, dropout):\n",
+        "        super(Decoder, self).__init__()\n",
+        "        self.n_layers = n_layers\n",
+        "        self.dec_layers = nn.ModuleList([\n",
+        "            DecoderLayer(d_model, n_heads, d_ff, dropout)\n",
+        "            for _ in range(n_layers)\n",
+        "        ])\n",
+        "        self.final_norm = nn.LayerNorm(d_model, eps=1e-6)\n",
+        "\n",
+        "    def forward(self, x, enc_out, causality_mask, padding_mask):\n",
+        "        out = x\n",
+        "\n",
+        "        dec_attns = []\n",
+        "        dec_enc_attns = []\n",
+        "        for i in range(self.n_layers):\n",
+        "            out, dec_attn, dec_enc_attn = \\\n",
+        "                self.dec_layers[i](out, enc_out, causality_mask, padding_mask)\n",
+        "\n",
+        "            dec_attns.append(dec_attn)\n",
+        "            dec_enc_attns.append(dec_enc_attn)\n",
+        "        out = self.final_norm(out)\n",
+        "        return out, dec_attns, dec_enc_attns\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 18,
+      "id": "8ed2a0bb-ab02-40e0-a6a5-939df21e091a",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "8ed2a0bb-ab02-40e0-a6a5-939df21e091a",
+        "outputId": "90fb2cca-73a4-4187-ee3f-6771cd5477b1"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "class Transformer(nn.Module):\n",
+        "    def __init__(self,\n",
+        "                 n_layers,\n",
+        "                 d_model,\n",
+        "                 n_heads,\n",
+        "                 d_ff,\n",
+        "                 src_vocab_size,\n",
+        "                 tgt_vocab_size,\n",
+        "                 pos_len,\n",
+        "                 dropout=0.2,\n",
+        "                 shared=True):\n",
+        "\n",
+        "        super(Transformer, self).__init__()\n",
+        "\n",
+        "        self.d_model = d_model\n",
+        "        self.shared = shared\n",
+        "\n",
+        "        self.enc_emb = nn.Embedding(src_vocab_size, d_model)\n",
+        "        self.dec_emb = nn.Embedding(tgt_vocab_size, d_model)\n",
+        "\n",
+        "        self.pos_encoding = torch.tensor(positional_encoding(pos_len, d_model), dtype=torch.float32)\n",
+        "        self.dropout = nn.Dropout(dropout)\n",
+        "\n",
+        "        self.encoder = Encoder(n_layers, d_model, n_heads, d_ff, dropout)\n",
+        "        self.decoder = Decoder(n_layers, d_model, n_heads, d_ff, dropout)\n",
+        "\n",
+        "        self.fc = nn.Linear(d_model, tgt_vocab_size)\n",
+        "\n",
+        "        if shared:\n",
+        "            self.fc.weight = self.dec_emb.weight\n",
+        "\n",
+        "    def embedding(self, emb, x):\n",
+        "        seq_len = x.shape[1]\n",
+        "\n",
+        "        out = emb(x)\n",
+        "\n",
+        "        if self.shared:\n",
+        "            out *= torch.sqrt(torch.tensor(self.d_model, dtype=torch.float32))\n",
+        "\n",
+        "        pos_enc = self.pos_encoding[:seq_len, :].unsqueeze(0).to(x.device)\n",
+        "        out += pos_enc\n",
+        "\n",
+        "        out = self.dropout(out)\n",
+        "        return out\n",
+        "\n",
+        "    def forward(self, enc_in, dec_in, enc_mask, causality_mask, dec_mask):\n",
+        "        enc_in = self.embedding(self.enc_emb, enc_in)\n",
+        "        dec_in = self.embedding(self.dec_emb, dec_in)\n",
+        "\n",
+        "        enc_out, enc_attns = self.encoder(enc_in, enc_mask)\n",
+        "\n",
+        "        dec_out, dec_attns, dec_enc_attns = self.decoder(dec_in, enc_out, causality_mask, dec_mask)\n",
+        "\n",
+        "        logits = self.fc(dec_out)\n",
+        "\n",
+        "        return logits, enc_attns, dec_attns, dec_enc_attns\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 19,
+      "id": "3c45eb8e-5f7f-44ab-952e-f7b2706dbeff",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "3c45eb8e-5f7f-44ab-952e-f7b2706dbeff",
+        "outputId": "24e9adb4-527c-4100-b396-a81ff30d8a75"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "def generate_padding_mask(seq):\n",
+        "    \"\"\" 패딩된 부분(0)을 1로 변환하여 마스크 생성 \"\"\"\n",
+        "    mask = (seq == 0).float()\n",
+        "    return mask[:, None, None, :]\n",
+        "\n",
+        "def generate_causality_mask(src_len, tgt_len):\n",
+        "    \"\"\" 미래 정보를 참조하지 않도록 Causal Mask 생성 \"\"\"\n",
+        "    mask = 1 - torch.cumsum(torch.eye(src_len, tgt_len), dim=0)\n",
+        "    return mask.float()\n",
+        "\n",
+        "def generate_masks(src, tgt):\n",
+        "    \"\"\" Encoder-Decoder에서 사용할 마스크 생성 \"\"\"\n",
+        "    enc_mask = generate_padding_mask(src)\n",
+        "    dec_mask = generate_padding_mask(tgt)\n",
+        "\n",
+        "    dec_causality_mask = generate_causality_mask(tgt.shape[1], tgt.shape[1])\n",
+        "    dec_mask = torch.max(dec_mask, dec_causality_mask.to(dec_mask.device))\n",
+        "\n",
+        "    dec_enc_causality_mask = generate_causality_mask(tgt.shape[1], src.shape[1])\n",
+        "    dec_enc_mask = torch.max(enc_mask, dec_enc_causality_mask.to(enc_mask.device))\n",
+        "\n",
+        "    return enc_mask, dec_enc_mask, dec_mask\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 20,
+      "id": "17e0a7a5-f976-402f-b764-37bdf828328e",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "17e0a7a5-f976-402f-b764-37bdf828328e",
+        "outputId": "2127df5c-5531-44fa-83f0-74f57efaa3e8"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "transformer = Transformer(\n",
+        "    n_layers=2,\n",
+        "    d_model=512,\n",
+        "    n_heads=8,\n",
+        "    d_ff=2048,\n",
+        "    src_vocab_size=SRC_VOCAB_SIZE,\n",
+        "    tgt_vocab_size=TGT_VOCAB_SIZE,\n",
+        "    pos_len=200,\n",
+        "    dropout=0.2,\n",
+        "    shared=True\n",
+        ")\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 21,
+      "id": "ba47f978-d982-4dc3-bbb8-a95d09f53d9c",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "ba47f978-d982-4dc3-bbb8-a95d09f53d9c",
+        "outputId": "843e4aee-e2b3-4e19-8424-145a1fc35b50"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "import math\n",
+        "\n",
+        "class LearningRateScheduler(torch.optim.lr_scheduler._LRScheduler):\n",
+        "    def __init__(self, optimizer, d_model, warmup_steps=4000, last_epoch=-1):\n",
+        "        self.d_model = d_model\n",
+        "        self.warmup_steps = warmup_steps\n",
+        "        super(LearningRateScheduler, self).__init__(optimizer, last_epoch)\n",
+        "\n",
+        "    def get_lr(self):\n",
+        "        step = max(1, self.last_epoch)\n",
+        "        arg1 = step ** -0.5\n",
+        "        arg2 = step * (self.warmup_steps ** -1.5)\n",
+        "        lr = (self.d_model ** -0.5) * min(arg1, arg2)\n",
+        "        return [lr for _ in self.base_lrs]\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 22,
+      "id": "3ea6f5da-e29f-4855-ad90-ebc7e577dbd8",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "3ea6f5da-e29f-4855-ad90-ebc7e577dbd8",
+        "outputId": "c8b65eb8-b949-4864-e14c-c2fdd61dcc5f"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "# 1. Optimizer를 먼저 정의합니다. (초기 lr은 임의의 값이나 기본값 설정)\n",
+        "optimizer = torch.optim.Adam(\n",
+        "    transformer.parameters(),  # 변수 집단 대신 생성한 모델의 parameters()를 직접 넣는 것이 일반적입니다.\n",
+        "    lr=0,                      # 스케줄러가 시작할 때 어차피 조정해 주므로 0이나 작은 값으로 둡니다.\n",
+        "    betas=(0.9, 0.98),\n",
+        "    eps=1e-9\n",
+        ")\n",
+        "\n",
+        "# 2. 생성된 optimizer를 스케줄러에 주입합니다.\n",
+        "learning_rate = LearningRateScheduler(optimizer, d_model=512)\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 23,
+      "id": "4403f155-8d5a-4cda-b3b0-a8313ca99820",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "4403f155-8d5a-4cda-b3b0-a8313ca99820",
+        "outputId": "f5cb4367-e7a9-4cbb-bbe9-cd420ee2bc54"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "import torch.nn as nn\n",
+        "\n",
+        "# [추가할 코드] 손실 함수 객체를 정의합니다.\n",
+        "# 패딩 토큰(0)은 무시하고, 마스킹 연산을 위해 수치를 결합하지 않고(none) 그대로 반환합니다.\n",
+        "loss_object = nn.CrossEntropyLoss(ignore_index=0, reduction='none')\n",
+        "\n",
+        "def loss_function(real, pred):\n",
+        "    # 1. 정답(real)에서 패딩(0)이 아닌 부분을 마스킹합니다.\n",
+        "    mask = (real != 0)\n",
+        "\n",
+        "    # 2. CrossEntropyLoss가 계산할 수 있도록 차원을 정렬합니다.\n",
+        "    # pred 채널(단어 차원)을 마지막에서 클래스로 인식할 수 있도록 펼쳐줍니다.\n",
+        "    # pred: [Batch, Seq_Len, Vocab_Size] -> [Batch * Seq_Len, Vocab_Size]\n",
+        "    pred_flat = pred.contiguous().view(-1, pred.size(-1))\n",
+        "\n",
+        "    # real: [Batch, Seq_Len] -> [Batch * Seq_Len]\n",
+        "    real_flat = real.contiguous().view(-1)\n",
+        "\n",
+        "    # 3. loss_object에 (예측값, 정답) 순서로 펼쳐진 데이터를 전달합니다.\n",
+        "    loss_ = loss_object(pred_flat, real_flat)\n",
+        "\n",
+        "    # 4. 마스크를 1차원으로 펼쳐서 손실 값에 곱해줍니다.\n",
+        "    mask = mask.view(-1).float()\n",
+        "    loss_ *= mask\n",
+        "\n",
+        "    # 5. 마스킹되지 않은 실제 단어 수만큼 나누어 평균 손실을 구합니다.\n",
+        "    return loss_.sum() / mask.sum()\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 24,
+      "id": "10c19632-1880-4cb3-b66a-84f7f2e13c8e",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "10c19632-1880-4cb3-b66a-84f7f2e13c8e",
+        "outputId": "c9a7a42d-0a40-4514-bac8-e0e5d0b54ad9"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Train Step 함수 정의\n",
+        "def train_step(src, tgt, model, optimizer):\n",
+        "    gold = tgt[:, 1:]\n",
+        "\n",
+        "    enc_mask, dec_enc_mask, dec_mask = generate_masks(src, tgt)\n",
+        "\n",
+        "    # 계산된 loss에 대해 역전파(Backpropagation)를 적용해 학습을 진행합니다.\n",
+        "    optimizer.zero_grad()\n",
+        "    predictions, enc_attns, dec_attns, dec_enc_attns = model(src, tgt, enc_mask, dec_enc_mask, dec_mask)\n",
+        "    loss = loss_function(gold, predictions[:, :-1])\n",
+        "\n",
+        "    loss.backward()\n",
+        "\n",
+        "    # 최종적으로 optimizer.step()이 사용됩니다.\n",
+        "    optimizer.step()\n",
+        "\n",
+        "    return loss, enc_attns, dec_attns, dec_enc_attns\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 25,
+      "id": "5dec3f1c-6634-45ba-b06b-de3bb65eb4dc",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "5dec3f1c-6634-45ba-b06b-de3bb65eb4dc",
+        "outputId": "3f662b34-4f4f-4abf-a8ec-41d02e3f05ad"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Attention 시각화 함수\n",
+        "\n",
+        "def visualize_attention(src, tgt, enc_attns, dec_attns, dec_enc_attns):\n",
+        "    def draw(data, ax, x=\"auto\", y=\"auto\"):\n",
+        "        import seaborn\n",
+        "        seaborn.heatmap(data,\n",
+        "                        square=True,\n",
+        "                        vmin=0.0, vmax=1.0,\n",
+        "                        cbar=False, ax=ax,\n",
+        "                        xticklabels=x,\n",
+        "                        yticklabels=y)\n",
+        "\n",
+        "    for layer in range(0, 2, 1):\n",
+        "        fig, axs = plt.subplots(1, 4, figsize=(20, 10))\n",
+        "        print(\"Encoder Layer\", layer + 1)\n",
+        "        for h in range(4):\n",
+        "            draw(enc_attns[layer][0, h, :len(src), :len(src)], axs[h], src, src)\n",
+        "        plt.show()\n",
+        "\n",
+        "    for layer in range(0, 2, 1):\n",
+        "        fig, axs = plt.subplots(1, 4, figsize=(20, 10))\n",
+        "        print(\"Decoder Self Layer\", layer+1)\n",
+        "        for h in range(4):\n",
+        "            draw(dec_attns[layer][0, h, :len(tgt), :len(tgt)], axs[h], tgt, tgt)\n",
+        "        plt.show()\n",
+        "\n",
+        "        print(\"Decoder Src Layer\", layer+1)\n",
+        "        fig, axs = plt.subplots(1, 4, figsize=(20, 10))\n",
+        "        for h in range(4):\n",
+        "            draw(dec_enc_attns[layer][0, h, :len(tgt), :len(src)], axs[h], src, tgt)\n",
+        "        plt.show()\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 26,
+      "id": "25ae1b19-2b3f-4e22-bfd3-2ffee03cb180",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "25ae1b19-2b3f-4e22-bfd3-2ffee03cb180",
+        "outputId": "f5fa12cc-9675-4b7f-ce60-f3a5bfefd421"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "# 번역 생성 함수\n",
+        "\n",
+        "def evaluate(sentence, model, src_tokenizer, tgt_tokenizer, device):\n",
+        "    sentence = preprocess_sentence(sentence)\n",
+        "\n",
+        "    pieces = src_tokenizer.encode_as_pieces(sentence)\n",
+        "    tokens = src_tokenizer.encode_as_ids(sentence)\n",
+        "\n",
+        "    # Fix: Handle cases where tokenization results in an empty list\n",
+        "    if not tokens:\n",
+        "        print(f\"Warning: Input sentence '{sentence}' resulted in empty tokens. Skipping translation.\")\n",
+        "        return [], \"\", None, None, None\n",
+        "\n",
+        "    _input = torch.tensor(tokens, device=device).unsqueeze(0)\n",
+        "\n",
+        "    ids = []\n",
+        "    output = torch.tensor([tgt_tokenizer.bos_id()], device=device).unsqueeze(0)\n",
+        "    for i in range(dec_train.shape[-1]):\n",
+        "        enc_padding_mask, combined_mask, dec_padding_mask = generate_masks(_input, output)\n",
+        "\n",
+        "        predictions, enc_attns, dec_attns, dec_enc_attns = \\\n",
+        "        model(_input, output, enc_padding_mask, combined_mask, dec_padding_mask)\n",
+        "\n",
+        "        predicted_id = torch.argmax(torch.softmax(predictions, dim=-1)[0, -1]).item()\n",
+        "\n",
+        "        if tgt_tokenizer.eos_id() == predicted_id:\n",
+        "            result = tgt_tokenizer.decode_ids(ids)\n",
+        "            return pieces, result, enc_attns, dec_attns, dec_enc_attns\n",
+        "\n",
+        "        ids.append(predicted_id)\n",
+        "        output = torch.cat([output, torch.tensor([[predicted_id]], device=device)], dim=-1)\n",
+        "\n",
+        "    result = tgt_tokenizer.decode_ids(ids)\n",
+        "\n",
+        "    return pieces, result, enc_attns, dec_attns, dec_enc_attns\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 27,
+      "id": "837d2135-cc29-4318-8a1d-66f732cbf1c1",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "837d2135-cc29-4318-8a1d-66f732cbf1c1",
+        "outputId": "03a7d2ce-8d62-4587-f41e-6b1bcfa0ccee"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "슝~\n"
+          ]
+        }
+      ],
+      "source": [
+        "# 번역 생성 및 Attention 시각화 결합\n",
+        "\n",
+        "def translate(sentence, model, src_tokenizer, tgt_tokenizer, device, plot_attention=False):\n",
+        "    pieces, result, enc_attns, dec_attns, dec_enc_attns = \\\n",
+        "    evaluate(sentence, model, src_tokenizer, tgt_tokenizer, device)\n",
+        "\n",
+        "    print('Input: %s' % (sentence))\n",
+        "    print('Predicted translation: {}'.format(result))\n",
+        "\n",
+        "    if plot_attention:\n",
+        "        visualize_attention(pieces, result.split(), enc_attns, dec_attns, dec_enc_attns)\n",
+        "\n",
+        "print(\"슝~\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "0adb8edd-0ab9-478d-b650-d76324eb5141",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "0adb8edd-0ab9-478d-b650-d76324eb5141",
+        "outputId": "5024092d-53fe-447b-e621-4b52ee501b17"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  1: 100%|██████████| 1127/1127 [03:11<00:00,  5.90it/s, Loss=454.7444]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Input: 오바마는 대통령이다.\n",
+            "Predicted translation: \n",
+            "Input: 시민들은 도시 속에 산다.\n",
+            "Predicted translation: \n",
+            "Input: 커피는 필요 없다.\n",
+            "Predicted translation: \n",
+            "Input: 일곱 명의 사망자가 발생했다.\n",
+            "Predicted translation: \n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  2: 100%|██████████| 1127/1127 [03:24<00:00,  5.50it/s, Loss=453.8430]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Input: 오바마는 대통령이다.\n",
+            "Predicted translation: \n",
+            "Input: 시민들은 도시 속에 산다.\n",
+            "Predicted translation: \n",
+            "Input: 커피는 필요 없다.\n",
+            "Predicted translation: \n",
+            "Input: 일곱 명의 사망자가 발생했다.\n",
+            "Predicted translation: \n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  3: 100%|██████████| 1127/1127 [03:25<00:00,  5.49it/s, Loss=452.8054]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Input: 오바마는 대통령이다.\n",
+            "Predicted translation: \n",
+            "Input: 시민들은 도시 속에 산다.\n",
+            "Predicted translation: \n",
+            "Input: 커피는 필요 없다.\n",
+            "Predicted translation: \n",
+            "Input: 일곱 명의 사망자가 발생했다.\n",
+            "Predicted translation: \n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  4: 100%|██████████| 1127/1127 [03:25<00:00,  5.49it/s, Loss=451.5886]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Input: 오바마는 대통령이다.\n",
+            "Predicted translation: \n",
+            "Input: 시민들은 도시 속에 산다.\n",
+            "Predicted translation: \n",
+            "Input: 커피는 필요 없다.\n",
+            "Predicted translation: \n",
+            "Input: 일곱 명의 사망자가 발생했다.\n",
+            "Predicted translation: \n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  5: 100%|██████████| 1127/1127 [03:24<00:00,  5.51it/s, Loss=450.1595]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Input: 오바마는 대통령이다.\n",
+            "Predicted translation: \n",
+            "Input: 시민들은 도시 속에 산다.\n",
+            "Predicted translation: \n",
+            "Input: 커피는 필요 없다.\n",
+            "Predicted translation: \n",
+            "Input: 일곱 명의 사망자가 발생했다.\n",
+            "Predicted translation: \n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  6: 100%|██████████| 1127/1127 [03:25<00:00,  5.49it/s, Loss=448.4619]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Input: 오바마는 대통령이다.\n",
+            "Predicted translation: \n",
+            "Input: 시민들은 도시 속에 산다.\n",
+            "Predicted translation: \n",
+            "Input: 커피는 필요 없다.\n",
+            "Predicted translation: \n",
+            "Input: 일곱 명의 사망자가 발생했다.\n",
+            "Predicted translation: \n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Epoch  7:  30%|██▉       | 334/1127 [01:00<02:23,  5.51it/s, Loss=447.1522]"
+          ]
+        }
+      ],
+      "source": [
+        "import torch\n",
+        "import random\n",
+        "from tqdm import tqdm\n",
+        "# 💡 1. 디바이스 정의 (GPU가 있으면 cuda, 없으면 cpu)\n",
+        "device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n",
+        "\n",
+        "# --- Added code to re-instantiate transformer and related objects ---\n",
+        "# Assuming Transformer class, SRC_VOCAB_SIZE, TGT_VOCAB_SIZE are defined in global scope\n",
+        "transformer = Transformer(\n",
+        "    n_layers=2,\n",
+        "    d_model=512,\n",
+        "    n_heads=8,\n",
+        "    d_ff=2048,\n",
+        "    src_vocab_size=SRC_VOCAB_SIZE,\n",
+        "    tgt_vocab_size=TGT_VOCAB_SIZE,\n",
+        "    pos_len=200,\n",
+        "    dropout=0.2,\n",
+        "    shared=True\n",
+        ")\n",
+        "\n",
+        "# 💡 2. 에포크 시작 전, 모델을 GPU로 보냅니다. (딱 한 번만 실행됨)\n",
+        "transformer = transformer.to(device) # Optimizer가 생성되기 전에 모델을 장치로 이동\n",
+        "\n",
+        "# Assuming LearningRateScheduler and torch.nn are defined in global scope\n",
+        "import torch.nn as nn\n",
+        "optimizer = torch.optim.Adam(\n",
+        "    transformer.parameters(), # 이제 optimizer는 GPU 파라미터에 연결됩니다.\n",
+        "    lr=0,\n",
+        "    betas=(0.9, 0.98),\n",
+        "    eps=1e-9\n",
+        ")\n",
+        "learning_rate = LearningRateScheduler(optimizer, d_model=512)\n",
+        "\n",
+        "loss_object = nn.CrossEntropyLoss(ignore_index=0, reduction='none')\n",
+        "# --- End of added code ---\n",
+        "\n",
+        "BATCH_SIZE = 64\n",
+        "EPOCHS = 20\n",
+        "\n",
+        "examples = [\n",
+        "    \"오바마는 대통령이다.\",\n",
+        "    \"시민들은 도시 속에 산다.\",\n",
+        "    \"커피는 필요 없다.\",\n",
+        "    \"일곱 명의 사망자가 발생했다.\"\n",
+        "]\n",
+        "\n",
+        "for epoch in range(EPOCHS):\n",
+        "    total_loss = 0\n",
+        "\n",
+        "    idx_list = list(range(0, enc_train.shape[0], BATCH_SIZE))\n",
+        "    random.shuffle(idx_list)\n",
+        "    t = tqdm(idx_list)\n",
+        "\n",
+        "    for (batch, idx) in enumerate(t):\n",
+        "        # 💡 3. 64개씩 잘라낸 텐서 데이터를 '여기서' GPU로 보내줍니다.\n",
+        "        src_batch = enc_train[idx:idx+BATCH_SIZE].to(device)\n",
+        "        tgt_batch = dec_train[idx:idx+BATCH_SIZE].to(device)\n",
+        "\n",
+        "        # GPU로 보낸 데이터를 train_step에 입력합니다.\n",
+        "        batch_loss, enc_attns, dec_attns, dec_enc_attns = \\\n",
+        "        train_step(src_batch,\n",
+        "                    tgt_batch,\n",
+        "                    transformer,\n",
+        "                    optimizer)\n",
+        "\n",
+        "        total_loss += batch_loss\n",
+        "\n",
+        "        t.set_description('Epoch %2d' % (epoch + 1))\n",
+        "        t.set_postfix({'Loss': '%.4f' % (total_loss.item() / (batch + 1))})\n",
+        "\n",
+        "    for example in examples:\n",
+        "        translate(example, transformer, ko_tokenizer, en_tokenizer, device)"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.12.11"
+    },
+    "colab": {
+      "provenance": [],
+      "gpuType": "T4",
+      "include_colab_link": true
+    },
+    "accelerator": "GPU",
+    "widgets": {
+      "application/vnd.jupyter.widget-state+json": {
+        "ce9f391dae10472cb419a7325fe31e3c": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "HBoxModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_dom_classes": [],
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "HBoxModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/controls",
+            "_view_module_version": "1.5.0",
+            "_view_name": "HBoxView",
+            "box_style": "",
+            "children": [
+              "IPY_MODEL_0787232240d54e638475aeb9675561e4",
+              "IPY_MODEL_23541bedc9a0491fba30e10f71203ab0",
+              "IPY_MODEL_9a95700a0a9f425b9f36cad758173bb0"
+            ],
+            "layout": "IPY_MODEL_fea823f0859749fabdd3fff3c927621f"
+          }
+        },
+        "0787232240d54e638475aeb9675561e4": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "HTMLModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_dom_classes": [],
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "HTMLModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/controls",
+            "_view_module_version": "1.5.0",
+            "_view_name": "HTMLView",
+            "description": "",
+            "description_tooltip": null,
+            "layout": "IPY_MODEL_790937ef217c45f2b8a0f7659042cd7f",
+            "placeholder": "​",
+            "style": "IPY_MODEL_23ad8de3cf5342079eec1b822e70b0ad",
+            "value": "100%"
+          }
+        },
+        "23541bedc9a0491fba30e10f71203ab0": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "FloatProgressModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_dom_classes": [],
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "FloatProgressModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/controls",
+            "_view_module_version": "1.5.0",
+            "_view_name": "ProgressView",
+            "bar_style": "success",
+            "description": "",
+            "description_tooltip": null,
+            "layout": "IPY_MODEL_44d053eeda5d4d27a60b08d9d4981770",
+            "max": 78968,
+            "min": 0,
+            "orientation": "horizontal",
+            "style": "IPY_MODEL_846cc56f6cb8456ca1281c037c3dbda7",
+            "value": 78968
+          }
+        },
+        "9a95700a0a9f425b9f36cad758173bb0": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "HTMLModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_dom_classes": [],
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "HTMLModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/controls",
+            "_view_module_version": "1.5.0",
+            "_view_name": "HTMLView",
+            "description": "",
+            "description_tooltip": null,
+            "layout": "IPY_MODEL_36cfe0bf147346538ee94c70dc9c7bbe",
+            "placeholder": "​",
+            "style": "IPY_MODEL_993f4e55b69546b6997038791000cb65",
+            "value": " 78968/78968 [00:15&lt;00:00, 7092.45it/s]"
+          }
+        },
+        "fea823f0859749fabdd3fff3c927621f": {
+          "model_module": "@jupyter-widgets/base",
+          "model_name": "LayoutModel",
+          "model_module_version": "1.2.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/base",
+            "_model_module_version": "1.2.0",
+            "_model_name": "LayoutModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "LayoutView",
+            "align_content": null,
+            "align_items": null,
+            "align_self": null,
+            "border": null,
+            "bottom": null,
+            "display": null,
+            "flex": null,
+            "flex_flow": null,
+            "grid_area": null,
+            "grid_auto_columns": null,
+            "grid_auto_flow": null,
+            "grid_auto_rows": null,
+            "grid_column": null,
+            "grid_gap": null,
+            "grid_row": null,
+            "grid_template_areas": null,
+            "grid_template_columns": null,
+            "grid_template_rows": null,
+            "height": null,
+            "justify_content": null,
+            "justify_items": null,
+            "left": null,
+            "margin": null,
+            "max_height": null,
+            "max_width": null,
+            "min_height": null,
+            "min_width": null,
+            "object_fit": null,
+            "object_position": null,
+            "order": null,
+            "overflow": null,
+            "overflow_x": null,
+            "overflow_y": null,
+            "padding": null,
+            "right": null,
+            "top": null,
+            "visibility": null,
+            "width": null
+          }
+        },
+        "790937ef217c45f2b8a0f7659042cd7f": {
+          "model_module": "@jupyter-widgets/base",
+          "model_name": "LayoutModel",
+          "model_module_version": "1.2.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/base",
+            "_model_module_version": "1.2.0",
+            "_model_name": "LayoutModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "LayoutView",
+            "align_content": null,
+            "align_items": null,
+            "align_self": null,
+            "border": null,
+            "bottom": null,
+            "display": null,
+            "flex": null,
+            "flex_flow": null,
+            "grid_area": null,
+            "grid_auto_columns": null,
+            "grid_auto_flow": null,
+            "grid_auto_rows": null,
+            "grid_column": null,
+            "grid_gap": null,
+            "grid_row": null,
+            "grid_template_areas": null,
+            "grid_template_columns": null,
+            "grid_template_rows": null,
+            "height": null,
+            "justify_content": null,
+            "justify_items": null,
+            "left": null,
+            "margin": null,
+            "max_height": null,
+            "max_width": null,
+            "min_height": null,
+            "min_width": null,
+            "object_fit": null,
+            "object_position": null,
+            "order": null,
+            "overflow": null,
+            "overflow_x": null,
+            "overflow_y": null,
+            "padding": null,
+            "right": null,
+            "top": null,
+            "visibility": null,
+            "width": null
+          }
+        },
+        "23ad8de3cf5342079eec1b822e70b0ad": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "DescriptionStyleModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "DescriptionStyleModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "StyleView",
+            "description_width": ""
+          }
+        },
+        "44d053eeda5d4d27a60b08d9d4981770": {
+          "model_module": "@jupyter-widgets/base",
+          "model_name": "LayoutModel",
+          "model_module_version": "1.2.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/base",
+            "_model_module_version": "1.2.0",
+            "_model_name": "LayoutModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "LayoutView",
+            "align_content": null,
+            "align_items": null,
+            "align_self": null,
+            "border": null,
+            "bottom": null,
+            "display": null,
+            "flex": null,
+            "flex_flow": null,
+            "grid_area": null,
+            "grid_auto_columns": null,
+            "grid_auto_flow": null,
+            "grid_auto_rows": null,
+            "grid_column": null,
+            "grid_gap": null,
+            "grid_row": null,
+            "grid_template_areas": null,
+            "grid_template_columns": null,
+            "grid_template_rows": null,
+            "height": null,
+            "justify_content": null,
+            "justify_items": null,
+            "left": null,
+            "margin": null,
+            "max_height": null,
+            "max_width": null,
+            "min_height": null,
+            "min_width": null,
+            "object_fit": null,
+            "object_position": null,
+            "order": null,
+            "overflow": null,
+            "overflow_x": null,
+            "overflow_y": null,
+            "padding": null,
+            "right": null,
+            "top": null,
+            "visibility": null,
+            "width": null
+          }
+        },
+        "846cc56f6cb8456ca1281c037c3dbda7": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "ProgressStyleModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "ProgressStyleModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "StyleView",
+            "bar_color": null,
+            "description_width": ""
+          }
+        },
+        "36cfe0bf147346538ee94c70dc9c7bbe": {
+          "model_module": "@jupyter-widgets/base",
+          "model_name": "LayoutModel",
+          "model_module_version": "1.2.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/base",
+            "_model_module_version": "1.2.0",
+            "_model_name": "LayoutModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "LayoutView",
+            "align_content": null,
+            "align_items": null,
+            "align_self": null,
+            "border": null,
+            "bottom": null,
+            "display": null,
+            "flex": null,
+            "flex_flow": null,
+            "grid_area": null,
+            "grid_auto_columns": null,
+            "grid_auto_flow": null,
+            "grid_auto_rows": null,
+            "grid_column": null,
+            "grid_gap": null,
+            "grid_row": null,
+            "grid_template_areas": null,
+            "grid_template_columns": null,
+            "grid_template_rows": null,
+            "height": null,
+            "justify_content": null,
+            "justify_items": null,
+            "left": null,
+            "margin": null,
+            "max_height": null,
+            "max_width": null,
+            "min_height": null,
+            "min_width": null,
+            "object_fit": null,
+            "object_position": null,
+            "order": null,
+            "overflow": null,
+            "overflow_x": null,
+            "overflow_y": null,
+            "padding": null,
+            "right": null,
+            "top": null,
+            "visibility": null,
+            "width": null
+          }
+        },
+        "993f4e55b69546b6997038791000cb65": {
+          "model_module": "@jupyter-widgets/controls",
+          "model_name": "DescriptionStyleModel",
+          "model_module_version": "1.5.0",
+          "state": {
+            "_model_module": "@jupyter-widgets/controls",
+            "_model_module_version": "1.5.0",
+            "_model_name": "DescriptionStyleModel",
+            "_view_count": null,
+            "_view_module": "@jupyter-widgets/base",
+            "_view_module_version": "1.2.0",
+            "_view_name": "StyleView",
+            "description_width": ""
+          }
+        }
+      }
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
